@@ -1,0 +1,98 @@
+# serverless.yml
+
+service: serverless-book-store
+
+plugins:
+  - serverless-python-requirements
+  - serverless-wsgi
+
+custom:
+  tableName:
+    user_table: 'users-table-${self:provider.stage}'
+    books_table: 'BooksInfo'
+    orders_table: 'OrdersInfo'
+  wsgi:
+    app: app.app
+    packRequirements: false
+  pythonRequirements:
+    dockerizePip: non-linux
+
+provider:
+  name: aws
+  runtime: python3.7
+  stage: dev
+  profile: default
+  region: us-east-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - { "Fn::GetAtt": ["UsersDynamoDBTable", "Arn" ] }
+        - { "Fn::GetAtt": ["BooksInfo", "Arn" ] }
+        - { "Fn::GetAtt": ["OrdersInfo", "Arn" ] }
+  environment:
+    USERS_TABLE: ${self:custom.tableName.user_table}
+    BOOKS_TABLE: ${self:custom.tableName.books_table}
+    ORDERS_TABLE: ${self:custom.tableName.orders_table}
+
+functions:
+  app:
+    handler: wsgi_handler.handler
+    events:
+      - http: ANY /
+      - http: 'ANY {proxy+}'
+
+resources:
+  Resources:
+    UsersDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: userId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tableName.user_table}
+    BooksInfo:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: book_name
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: book_name
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tableName.books_table}
+
+    OrdersInfo:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: orderId
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: orderId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tableName.orders_table}
